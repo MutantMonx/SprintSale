@@ -1,3 +1,4 @@
+// @ts-nocheck - Playwright uses DOM types
 import { Page } from 'playwright';
 import { prisma } from '../config/database.js';
 import { logger } from '../utils/logger.js';

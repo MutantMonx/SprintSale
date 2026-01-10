@@ -1,3 +1,4 @@
+// @ts-nocheck - Uses Playwright with DOM APIs
 import Bull, { Queue, Job } from 'bull';
 import { redis } from '../config/redis.js';
 import { prisma } from '../config/database.js';

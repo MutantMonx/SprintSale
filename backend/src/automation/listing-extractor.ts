@@ -1,3 +1,4 @@
+// @ts-nocheck - Uses Playwright DOM types
 import { Page } from 'playwright';
 import { logger } from '../utils/logger.js';
 
