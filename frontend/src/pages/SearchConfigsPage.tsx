@@ -5,12 +5,11 @@ import {
     Play,
     Pause,
     Trash2,
-    ChevronRight,
     Clock
 } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { searchConfigsApi, servicesApi } from '@/lib/api'
+import { searchConfigsApi } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
 import { formatRelativeTime } from '@/lib/utils'
 
@@ -147,8 +146,8 @@ export default function SearchConfigsPage() {
                         <Card
                             key={config.id}
                             className={`transition-all duration-200 ${config.isActive
-                                    ? 'border-primary/50 shadow-sm'
-                                    : 'opacity-75'
+                                ? 'border-primary/50 shadow-sm'
+                                : 'opacity-75'
                                 }`}
                         >
                             <CardContent className="p-6">
