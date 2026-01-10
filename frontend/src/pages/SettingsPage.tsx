@@ -14,13 +14,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuthStore } from '@/store/auth'
 import { authApi } from '@/lib/api'
-import { useToast } from '@/hooks/use-toast'
 import { useNavigate } from 'react-router-dom'
 
 export default function SettingsPage() {
     const { user, refreshToken, logout } = useAuthStore()
     const [darkMode, setDarkMode] = useState(document.documentElement.classList.contains('dark'))
-    const { toast } = useToast()
     const navigate = useNavigate()
 
     const toggleDarkMode = () => {
