@@ -54,6 +54,7 @@ services:
       - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-securepass}@db:5432/${DB_NAME:-sprintsale}?schema=public
       - REDIS_URL=redis://redis:6379
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-32-char-encryption-key-here!!!!}
+      - JWT_SECRET=${JWT_SECRET:-changeme_in_prod}
       - NODE_ENV=production
     depends_on:
       - backend

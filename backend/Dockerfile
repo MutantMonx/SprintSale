@@ -1,9 +1,12 @@
 # backend/Dockerfile
 
 # --- Stage 1: Builder ---
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
+
+# Install OpenSSL for Prisma
+RUN apt-get update -y && apt-get install -y openssl libssl-dev && rm -rf /var/lib/apt/lists/*
 
 # Copy package files first for better caching
 COPY package*.json ./
@@ -20,9 +23,12 @@ RUN npx prisma generate
 RUN npm run build
 
 # --- Stage 2: Runner ---
-FROM node:20-alpine
+FROM node:20-slim
 
 WORKDIR /app
+
+# Install OpenSSL for Prisma runtime
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 # Install production dependencies only
 COPY package*.json ./
