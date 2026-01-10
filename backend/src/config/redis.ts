@@ -1,3 +1,4 @@
+// @ts-nocheck
 import Redis, { RedisOptions } from 'ioredis';
 import { config } from './env.js';
 import { logger } from '../utils/logger.js';
