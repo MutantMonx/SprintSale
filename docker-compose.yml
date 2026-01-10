@@ -1,0 +1,99 @@
+# SprintSale - Docker Compose Configuration
+# One-command deployment: docker compose up -d
+
+services:
+  # --- BACKEND API ---
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sprintsale-api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-4000}:4000"
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-securepass}@db:5432/${DB_NAME:-sprintsale}?schema=public
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-changeme_in_prod}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-32-char-encryption-key-here!!!!}
+      - NODE_ENV=production
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@sprintsale.local}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-ChangeMe123!}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - app-network
+
+  # --- FRONTEND (WEB APP) ---
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sprintsale-web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-3000}:80"
+    environment:
+      - VITE_API_URL=http://localhost:${API_PORT:-4000}
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+  # --- WORKER (SCRAPER/PLAYWRIGHT) ---
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
+    container_name: sprintsale-worker
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-securepass}@db:5432/${DB_NAME:-sprintsale}?schema=public
+      - REDIS_URL=redis://redis:6379
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-32-char-encryption-key-here!!!!}
+      - NODE_ENV=production
+    depends_on:
+      - backend
+      - redis
+    networks:
+      - app-network
+
+  # --- DATABASE (POSTGRES) ---
+  db:
+    image: postgres:14-alpine
+    container_name: sprintsale-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-securepass}
+      - POSTGRES_DB=${DB_NAME:-sprintsale}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  # --- CACHE & QUEUE (REDIS) ---
+  redis:
+    image: redis:7-alpine
+    container_name: sprintsale-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  db_data:
+  redis_data:

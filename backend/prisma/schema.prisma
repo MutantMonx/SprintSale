@@ -1,0 +1,345 @@
+// Prisma Schema for SprintSale
+// Car listing aggregator with browser automation
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// AUTHENTICATION & USERS
+// ============================================================================
+
+enum UserTier {
+  FREE
+  PREMIUM
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  name          String?
+  tier          UserTier  @default(FREE)
+  emailVerified Boolean   @default(false) @map("email_verified")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  // Relations
+  userServices   UserService[]
+  searchConfigs  SearchConfig[]
+  notifications  Notification[]
+  mobileDevices  MobileDevice[]
+  auditLogs      AuditLog[]
+  refreshTokens  RefreshToken[]
+
+  @@map("users")
+}
+
+model AdminUser {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  passwordHash String  @map("password_hash")
+  name        String
+  totpSecret  String?  @map("totp_secret")
+  totpEnabled Boolean  @default(false) @map("totp_enabled")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  auditLogs AuditLog[]
+
+  @@map("admin_users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  revokedAt DateTime? @map("revoked_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+// ============================================================================
+// SERVICES & CREDENTIALS
+// ============================================================================
+
+model Service {
+  id            String   @id @default(uuid())
+  name          String   @unique
+  baseUrl       String   @map("base_url")
+  logoUrl       String?  @map("logo_url")
+  isActive      Boolean  @default(true) @map("is_active")
+  defaultConfig Json?    @map("default_config")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Relations
+  userServices UserService[]
+  workflows    AutomationWorkflow[]
+  searchConfigs SearchConfig[]
+  listings     Listing[]
+
+  @@map("services")
+}
+
+model UserService {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  serviceId String   @map("service_id")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  // Relations
+  credentials ServiceCredentials?
+
+  @@unique([userId, serviceId])
+  @@map("user_services")
+}
+
+model ServiceCredentials {
+  id                String   @id @default(uuid())
+  userServiceId     String   @unique @map("user_service_id")
+  encryptedUsername Bytes    @map("encrypted_username")
+  encryptedPassword Bytes    @map("encrypted_password")
+  iv                Bytes
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  userService UserService @relation(fields: [userServiceId], references: [id], onDelete: Cascade)
+
+  @@map("service_credentials")
+}
+
+// ============================================================================
+// AUTOMATION WORKFLOWS
+// ============================================================================
+
+model AutomationWorkflow {
+  id          String   @id @default(uuid())
+  serviceId   String   @map("service_id")
+  name        String
+  description String?
+  version     Int      @default(1)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  service Service        @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  steps   WorkflowStep[]
+
+  @@unique([serviceId, name])
+  @@map("automation_workflows")
+}
+
+enum WorkflowActionType {
+  NAVIGATE
+  CLICK
+  FILL
+  WAIT
+  EXTRACT
+  SCREENSHOT
+  SCROLL
+  SELECT
+}
+
+model WorkflowStep {
+  id             String             @id @default(uuid())
+  workflowId     String             @map("workflow_id")
+  stepOrder      Int                @map("step_order")
+  actionType     WorkflowActionType @map("action_type")
+  cssSelector    String?            @map("css_selector")
+  xpathSelector  String?            @map("xpath_selector")
+  parameters     Json?
+  validationRules Json?             @map("validation_rules")
+  errorRecovery  Json?              @map("error_recovery")
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  workflow AutomationWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, stepOrder])
+  @@map("workflow_steps")
+}
+
+// ============================================================================
+// SEARCH CONFIGURATIONS
+// ============================================================================
+
+model SearchConfig {
+  id                 String    @id @default(uuid())
+  userId             String    @map("user_id")
+  serviceId          String    @map("service_id")
+  name               String
+  keywords           Json      @default("[]")
+  priceMin           Int?      @map("price_min")
+  priceMax           Int?      @map("price_max")
+  location           String?
+  customFilters      Json?     @map("custom_filters")
+  intervalSeconds    Int       @default(60) @map("interval_seconds")
+  randomRangeSeconds Int       @default(15) @map("random_range_seconds")
+  isActive           Boolean   @default(true) @map("is_active")
+  lastRunAt          DateTime? @map("last_run_at")
+  nextRunAt          DateTime? @map("next_run_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  listings Listing[]
+
+  @@index([userId])
+  @@index([serviceId])
+  @@index([isActive, nextRunAt])
+  @@map("search_configs")
+}
+
+// ============================================================================
+// LISTINGS & CACHE
+// ============================================================================
+
+model Listing {
+  id             String    @id @default(uuid())
+  serviceId      String    @map("service_id")
+  searchConfigId String    @map("search_config_id")
+  externalId     String    @map("external_id")
+  title          String
+  description    String?
+  price          Int?
+  currency       String    @default("PLN")
+  location       String?
+  phone          String?
+  email          String?
+  listingUrl     String    @map("listing_url")
+  images         Json      @default("[]")
+  primaryHash    String    @unique @map("primary_hash")
+  semanticHash   String?   @map("semantic_hash")
+  previousPrice  Int?      @map("previous_price")
+  isAd           Boolean   @default(false) @map("is_ad")
+  detectedAt     DateTime  @default(now()) @map("detected_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  service       Service        @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  searchConfig  SearchConfig   @relation(fields: [searchConfigId], references: [id], onDelete: Cascade)
+  cache         ListingCache?
+  notifications Notification[]
+
+  @@index([serviceId])
+  @@index([searchConfigId])
+  @@index([detectedAt])
+  @@map("listings")
+}
+
+model ListingCache {
+  id          String   @id @default(uuid())
+  listingId   String   @unique @map("listing_id")
+  contentHash String   @unique @map("content_hash")
+  expiresAt   DateTime @map("expires_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("listing_cache")
+}
+
+// ============================================================================
+// NOTIFICATIONS
+// ============================================================================
+
+enum NotificationChannel {
+  PUSH
+  IN_APP
+  EMAIL
+  SMS
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+model Notification {
+  id        String             @id @default(uuid())
+  userId    String             @map("user_id")
+  listingId String             @map("listing_id")
+  channel   NotificationChannel
+  status    NotificationStatus @default(PENDING)
+  payload   Json
+  sentAt    DateTime?          @map("sent_at")
+  readAt    DateTime?          @map("read_at")
+  createdAt DateTime           @default(now()) @map("created_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// ============================================================================
+// MOBILE DEVICES
+// ============================================================================
+
+enum DevicePlatform {
+  IOS
+  ANDROID
+}
+
+model MobileDevice {
+  id          String         @id @default(uuid())
+  userId      String         @map("user_id")
+  deviceToken String         @unique @map("device_token")
+  platform    DevicePlatform
+  deviceName  String?        @map("device_name")
+  isActive    Boolean        @default(true) @map("is_active")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("mobile_devices")
+}
+
+// ============================================================================
+// AUDIT LOGS
+// ============================================================================
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?  @map("user_id")
+  adminUserId String?  @map("admin_user_id")
+  action      String
+  entityType  String   @map("entity_type")
+  entityId    String?  @map("entity_id")
+  oldValues   Json?    @map("old_values")
+  newValues   Json?    @map("new_values")
+  ipAddress   String?  @map("ip_address")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  adminUser AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([adminUserId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
