@@ -181,21 +181,22 @@ async function main() {
         }
     }
 
-    // Get FREE plan for admin user
-    const freePlan = await prisma.subscriptionPlan.findUnique({
-        where: { name: 'FREE' },
+    // Get PREMIUM plan for admin user (admin should have premium tier)
+    const premiumPlan = await prisma.subscriptionPlan.findUnique({
+        where: { name: 'PREMIUM' },
     });
 
-    // Update admin to have isAdmin flag and plan
-    if (freePlan) {
+    // Update admin to have isAdmin flag and PREMIUM plan
+    if (premiumPlan) {
         await prisma.user.updateMany({
             where: { email: adminEmail },
             data: {
                 isAdmin: true,
-                planId: freePlan.id,
+                tier: 'PREMIUM',
+                planId: premiumPlan.id,
             },
         });
-        console.log(`✅ Admin user updated with isAdmin flag and FREE plan`);
+        console.log(`✅ Admin user updated with isAdmin flag and PREMIUM plan`);
     }
 
     // Seed Legal Pages
