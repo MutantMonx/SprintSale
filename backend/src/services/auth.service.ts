@@ -31,6 +31,7 @@ export interface UserResponse {
     email: string;
     name: string | null;
     tier: UserTier;
+    isAdmin: boolean;
     emailVerified: boolean;
     createdAt: Date;
 }
@@ -263,6 +264,7 @@ class AuthService {
             email: user.email,
             name: user.name,
             tier: user.tier,
+            isAdmin: user.isAdmin,
             emailVerified: user.emailVerified,
             createdAt: user.createdAt,
         };
