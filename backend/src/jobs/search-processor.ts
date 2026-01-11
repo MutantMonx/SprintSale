@@ -3,7 +3,7 @@ import Bull, { Queue, Job } from 'bull';
 import { redis } from '../config/redis.js';
 import { prisma } from '../config/database.js';
 import { logger } from '../utils/logger.js';
-import { playwrightManager, extractListings } from '../automation/index.js';
+import { playwrightManager, extractListings, extractPhoneFromDetailPage, supportsPhoneExtraction } from '../automation/index.js';
 import { encryptionService } from '../services/encryption.service.js';
 import { notificationDispatcher } from './notification-dispatcher.js';
 
@@ -63,11 +63,19 @@ searchQueue.process(2, async (job: Job<SearchJobData>) => {
         await session.page.evaluate(() => window.scrollBy(0, 500));
         await randomDelay(1000, 2000);
 
-        // Extract listings
+        // Extract listings from search results page
         const extractedListings = await extractListings(session.page, serviceName);
 
+        // Extract phone numbers for first 5 listings (to avoid rate limiting)
+        const listingsWithPhones = await extractPhoneNumbers(
+            session.page,
+            extractedListings,
+            serviceName,
+            5 // Max listings to extract phones for
+        );
+
         // Process and deduplicate
-        const newListings = await processListings(job.data, extractedListings);
+        const newListings = await processListings(job.data, listingsWithPhones);
 
         // Update last run time
         await prisma.searchConfig.update({
@@ -90,6 +98,60 @@ searchQueue.process(2, async (job: Job<SearchJobData>) => {
         }
     }
 });
+
+/**
+ * Extract phone numbers by visiting each listing's detail page
+ * Limited to maxCount to avoid rate limiting
+ */
+async function extractPhoneNumbers(
+    page: any,
+    listings: Awaited<ReturnType<typeof extractListings>>,
+    serviceName: string,
+    maxCount: number
+): Promise<Awaited<ReturnType<typeof extractListings>>> {
+    // Check if service supports phone extraction
+    if (!supportsPhoneExtraction(serviceName)) {
+        logger.debug(`Service ${serviceName} does not support phone extraction`);
+        return listings;
+    }
+
+    const results = [];
+    const toExtract = listings.slice(0, maxCount);
+    const remaining = listings.slice(maxCount);
+
+    for (const listing of toExtract) {
+        try {
+            logger.debug(`Extracting phone for: ${listing.title}`);
+
+            // Navigate to detail page
+            await page.goto(listing.listingUrl, {
+                waitUntil: 'domcontentloaded',
+                timeout: 15000
+            });
+            await randomDelay(1000, 2000);
+
+            // Handle cookie consent on detail page
+            await handleCookieConsent(page);
+
+            // Extract phone
+            const phone = await extractPhoneFromDetailPage(page, serviceName);
+
+            results.push({
+                ...listing,
+                phone: phone || listing.phone,
+            });
+
+            // Random delay between extractions to avoid detection
+            await randomDelay(1500, 3000);
+        } catch (error) {
+            logger.debug(`Failed to extract phone for ${listing.listingUrl}:`, error);
+            results.push(listing);
+        }
+    }
+
+    // Add remaining listings without phone extraction
+    return [...results, ...remaining];
+}
 
 async function processListings(
     jobData: SearchJobData,
