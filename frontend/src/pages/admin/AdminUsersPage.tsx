@@ -47,6 +47,13 @@ interface UserFormData {
     tier: 'FREE' | 'PREMIUM'
     isAdmin: boolean
     emailVerified: boolean
+    // Granular permissions
+    customMaxServices: string
+    customMaxSearchConfigs: string
+    customMaxNotificationsDay: string
+    customDailySearchMinutes: string
+    canAddCustomService: 'default' | 'true' | 'false'
+    notes: string
 }
 
 const defaultFormData: UserFormData = {
@@ -55,7 +62,13 @@ const defaultFormData: UserFormData = {
     name: '',
     tier: 'FREE',
     isAdmin: false,
-    emailVerified: false
+    emailVerified: false,
+    customMaxServices: '',
+    customMaxSearchConfigs: '',
+    customMaxNotificationsDay: '',
+    customDailySearchMinutes: '',
+    canAddCustomService: 'default',
+    notes: ''
 }
 
 export default function AdminUsersPage() {
@@ -145,7 +158,13 @@ export default function AdminUsersPage() {
             name: user.name || '',
             tier: user.tier as 'FREE' | 'PREMIUM',
             isAdmin: user.isAdmin,
-            emailVerified: user.emailVerified
+            emailVerified: user.emailVerified,
+            customMaxServices: (user as any).customMaxServices?.toString() || '',
+            customMaxSearchConfigs: (user as any).customMaxSearchConfigs?.toString() || '',
+            customMaxNotificationsDay: (user as any).customMaxNotificationsDay?.toString() || '',
+            customDailySearchMinutes: (user as any).customDailySearchMinutes?.toString() || '',
+            canAddCustomService: (user as any).canAddCustomService === null ? 'default' : (user as any).canAddCustomService ? 'true' : 'false',
+            notes: (user as any).notes || ''
         })
         setFormError('')
         setShowModal(true)
@@ -170,7 +189,14 @@ export default function AdminUsersPage() {
                     name: formData.name || null,
                     tier: formData.tier,
                     isAdmin: formData.isAdmin,
-                    emailVerified: formData.emailVerified
+                    emailVerified: formData.emailVerified,
+                    // Granular permissions - send null to clear, number to set
+                    customMaxServices: formData.customMaxServices === '' ? null : parseInt(formData.customMaxServices),
+                    customMaxSearchConfigs: formData.customMaxSearchConfigs === '' ? null : parseInt(formData.customMaxSearchConfigs),
+                    customMaxNotificationsDay: formData.customMaxNotificationsDay === '' ? null : parseInt(formData.customMaxNotificationsDay),
+                    customDailySearchMinutes: formData.customDailySearchMinutes === '' ? null : parseInt(formData.customDailySearchMinutes),
+                    canAddCustomService: formData.canAddCustomService === 'default' ? null : formData.canAddCustomService === 'true',
+                    notes: formData.notes || null
                 }
                 await adminApi.users.update(editingUser.id, updateData)
             } else {
@@ -475,6 +501,87 @@ export default function AdminUsersPage() {
                                         <span className="text-sm">Email zweryfikowany</span>
                                     </label>
                                 </div>
+
+                                {/* Granular permissions - only show for editing */}
+                                {editingUser && (
+                                    <>
+                                        <div className="border-t pt-4 mt-4">
+                                            <h4 className="font-medium mb-3">Uprawnienia niestandardowe</h4>
+                                            <p className="text-xs text-muted-foreground mb-3">
+                                                Pozostaw puste, aby użyć limitów z planu. Wpisz 0 dla nielimitowanego dostępu.
+                                            </p>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="customMaxServices">Limit serwisów</Label>
+                                                    <Input
+                                                        id="customMaxServices"
+                                                        type="number"
+                                                        min="0"
+                                                        placeholder="Z planu"
+                                                        value={formData.customMaxServices}
+                                                        onChange={(e) => setFormData({ ...formData, customMaxServices: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="customMaxSearchConfigs">Limit wyszukiwań</Label>
+                                                    <Input
+                                                        id="customMaxSearchConfigs"
+                                                        type="number"
+                                                        min="0"
+                                                        placeholder="Z planu"
+                                                        value={formData.customMaxSearchConfigs}
+                                                        onChange={(e) => setFormData({ ...formData, customMaxSearchConfigs: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="customMaxNotificationsDay">Limit powiadomień/dzień</Label>
+                                                    <Input
+                                                        id="customMaxNotificationsDay"
+                                                        type="number"
+                                                        min="0"
+                                                        placeholder="Z planu"
+                                                        value={formData.customMaxNotificationsDay}
+                                                        onChange={(e) => setFormData({ ...formData, customMaxNotificationsDay: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="customDailySearchMinutes">Minuty wyszukiwania/dzień</Label>
+                                                    <Input
+                                                        id="customDailySearchMinutes"
+                                                        type="number"
+                                                        min="0"
+                                                        placeholder="Z planu"
+                                                        value={formData.customDailySearchMinutes}
+                                                        onChange={(e) => setFormData({ ...formData, customDailySearchMinutes: e.target.value })}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2 mt-4">
+                                                <Label htmlFor="canAddCustomService">Dodawanie własnych serwisów</Label>
+                                                <select
+                                                    id="canAddCustomService"
+                                                    value={formData.canAddCustomService}
+                                                    onChange={(e) => setFormData({ ...formData, canAddCustomService: e.target.value as 'default' | 'true' | 'false' })}
+                                                    className="w-full px-3 py-2 border rounded-md bg-background"
+                                                >
+                                                    <option value="default">Zgodnie z planem</option>
+                                                    <option value="true">Zezwól</option>
+                                                    <option value="false">Zabroń</option>
+                                                </select>
+                                            </div>
+                                            <div className="space-y-2 mt-4">
+                                                <Label htmlFor="notes">Notatki (widoczne tylko dla admina)</Label>
+                                                <textarea
+                                                    id="notes"
+                                                    value={formData.notes}
+                                                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                                                    className="w-full px-3 py-2 border rounded-md bg-background min-h-[60px]"
+                                                    placeholder="Notatki o użytkowniku..."
+                                                />
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
 
                                 <div className="flex gap-2 pt-4">
                                     <Button type="submit" disabled={formLoading} className="flex-1">

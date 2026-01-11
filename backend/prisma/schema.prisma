@@ -35,6 +35,15 @@ model User {
   planId        String?   @map("plan_id")
   plan          SubscriptionPlan? @relation(fields: [planId], references: [id])
 
+  // Custom permissions (override plan limits, null = use plan defaults)
+  customMaxServices       Int?    @map("custom_max_services")      // Max services, null=use plan, 0=unlimited
+  customMaxSearchConfigs  Int?    @map("custom_max_search_configs") // Max searches, null=use plan, 0=unlimited
+  customMaxNotificationsDay Int?  @map("custom_max_notifications_day") // Daily notifications, null=use plan
+  customDailySearchMinutes Int?   @map("custom_daily_search_minutes") // Daily search time
+  canAddCustomService     Boolean? @map("can_add_custom_service")  // null=use plan default
+  allowedServiceIds       String[] @map("allowed_service_ids")     // Empty=all services allowed, else only these
+  notes                   String?  // Admin notes about this user
+
   // Relations
   userServices   UserService[]
   searchConfigs  SearchConfig[]

@@ -232,7 +232,21 @@ router.post('/users', async (req: AuthRequest, res: Response, next) => {
 
 router.put('/users/:id', async (req: AuthRequest, res: Response, next) => {
     try {
-        const { name, tier, isAdmin, planId } = req.body;
+        const {
+            name,
+            tier,
+            isAdmin,
+            planId,
+            emailVerified,
+            // Granular permissions
+            customMaxServices,
+            customMaxSearchConfigs,
+            customMaxNotificationsDay,
+            customDailySearchMinutes,
+            canAddCustomService,
+            allowedServiceIds,
+            notes
+        } = req.body;
 
         const user = await prisma.user.update({
             where: { id: req.params.id },
@@ -241,6 +255,15 @@ router.put('/users/:id', async (req: AuthRequest, res: Response, next) => {
                 ...(tier !== undefined && { tier }),
                 ...(isAdmin !== undefined && { isAdmin }),
                 ...(planId !== undefined && { planId }),
+                ...(emailVerified !== undefined && { emailVerified }),
+                // Granular permissions
+                ...(customMaxServices !== undefined && { customMaxServices }),
+                ...(customMaxSearchConfigs !== undefined && { customMaxSearchConfigs }),
+                ...(customMaxNotificationsDay !== undefined && { customMaxNotificationsDay }),
+                ...(customDailySearchMinutes !== undefined && { customDailySearchMinutes }),
+                ...(canAddCustomService !== undefined && { canAddCustomService }),
+                ...(allowedServiceIds !== undefined && { allowedServiceIds }),
+                ...(notes !== undefined && { notes }),
             },
             include: { plan: true },
         });

@@ -5,11 +5,14 @@ import {
     Play,
     Pause,
     Trash2,
-    Clock
+    Clock,
+    X
 } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { searchConfigsApi } from '@/lib/api'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { searchConfigsApi, servicesApi } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
 import { formatRelativeTime } from '@/lib/utils'
 
@@ -31,14 +34,48 @@ interface SearchConfig {
     }
 }
 
+interface Service {
+    id: string
+    name: string
+    logoUrl: string | null
+}
+
+interface FormData {
+    name: string
+    serviceId: string
+    keywords: string
+    priceMin: string
+    priceMax: string
+    location: string
+    intervalMinutes: string
+}
+
+const defaultFormData: FormData = {
+    name: '',
+    serviceId: '',
+    keywords: '',
+    priceMin: '',
+    priceMax: '',
+    location: '',
+    intervalMinutes: '5'
+}
+
 export default function SearchConfigsPage() {
     const [configs, setConfigs] = useState<SearchConfig[]>([])
+    const [services, setServices] = useState<Service[]>([])
     const [loading, setLoading] = useState(true)
     const [actionLoading, setActionLoading] = useState<string | null>(null)
     const { toast } = useToast()
 
+    // Modal state
+    const [showModal, setShowModal] = useState(false)
+    const [formData, setFormData] = useState<FormData>(defaultFormData)
+    const [formLoading, setFormLoading] = useState(false)
+    const [formError, setFormError] = useState('')
+
     useEffect(() => {
         loadConfigs()
+        loadServices()
     }, [])
 
     const loadConfigs = async () => {
@@ -49,6 +86,15 @@ export default function SearchConfigsPage() {
             console.error('Failed to load search configs:', error)
         } finally {
             setLoading(false)
+        }
+    }
+
+    const loadServices = async () => {
+        try {
+            const response = await servicesApi.subscribed()
+            setServices(response.data.data || [])
+        } catch (error) {
+            console.error('Failed to load services:', error)
         }
     }
 
@@ -114,6 +160,61 @@ export default function SearchConfigsPage() {
         }
     }
 
+    const openModal = () => {
+        setFormData(defaultFormData)
+        setFormError('')
+        setShowModal(true)
+    }
+
+    const closeModal = () => {
+        setShowModal(false)
+        setFormData(defaultFormData)
+        setFormError('')
+    }
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setFormError('')
+        setFormLoading(true)
+
+        try {
+            if (!formData.name || !formData.serviceId) {
+                setFormError('Nazwa i serwis są wymagane')
+                setFormLoading(false)
+                return
+            }
+
+            const keywords = formData.keywords
+                .split(',')
+                .map(k => k.trim())
+                .filter(k => k.length > 0)
+
+            await searchConfigsApi.create({
+                name: formData.name,
+                serviceId: formData.serviceId,
+                keywords,
+                priceMin: formData.priceMin ? parseFloat(formData.priceMin) : null,
+                priceMax: formData.priceMax ? parseFloat(formData.priceMax) : null,
+                location: formData.location || null,
+                intervalSeconds: (parseInt(formData.intervalMinutes) || 5) * 60,
+                isActive: true
+            })
+
+            toast({
+                title: 'Wyszukiwanie utworzone',
+                description: 'Twoje nowe wyszukiwanie zostało dodane',
+                variant: 'success'
+            })
+
+            closeModal()
+            loadConfigs()
+        } catch (error: any) {
+            setFormError(error.response?.data?.error || 'Nie udało się utworzyć wyszukiwania')
+        } finally {
+            setFormLoading(false)
+        }
+    }
+
     return (
         <div className="space-y-8 animate-in">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -124,7 +225,7 @@ export default function SearchConfigsPage() {
                     </p>
                 </div>
 
-                <Button>
+                <Button onClick={openModal}>
                     <Plus className="w-4 h-4 mr-2" />
                     Nowe wyszukiwanie
                 </Button>
@@ -186,7 +287,7 @@ export default function SearchConfigsPage() {
                                             <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                                                 <span className="flex items-center gap-1">
                                                     <Clock className="w-3 h-3" />
-                                                    Co {config.intervalSeconds}s
+                                                    Co {Math.round(config.intervalSeconds / 60)} min
                                                 </span>
                                                 {config.lastRunAt && (
                                                     <span>
@@ -203,8 +304,7 @@ export default function SearchConfigsPage() {
                                             variant="outline"
                                             size="sm"
                                             onClick={() => handleRun(config.id)}
-                                            loading={actionLoading === config.id}
-                                            disabled={!config.isActive}
+                                            disabled={actionLoading === config.id || !config.isActive}
                                         >
                                             <Play className="w-4 h-4" />
                                         </Button>
@@ -213,7 +313,7 @@ export default function SearchConfigsPage() {
                                             variant={config.isActive ? 'secondary' : 'default'}
                                             size="sm"
                                             onClick={() => handleToggle(config.id)}
-                                            loading={actionLoading === config.id}
+                                            disabled={actionLoading === config.id}
                                         >
                                             {config.isActive ? (
                                                 <>
@@ -250,12 +350,141 @@ export default function SearchConfigsPage() {
                         <p className="text-muted-foreground mb-4">
                             Utwórz swoje pierwsze wyszukiwanie, aby zacząć śledzić ogłoszenia
                         </p>
-                        <Button>
+                        <Button onClick={openModal}>
                             <Plus className="w-4 h-4 mr-2" />
                             Nowe wyszukiwanie
                         </Button>
                     </CardContent>
                 </Card>
+            )}
+
+            {/* Create Search Modal */}
+            {showModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <Card className="w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <CardTitle>Nowe wyszukiwanie</CardTitle>
+                            <Button variant="ghost" size="sm" onClick={closeModal}>
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </CardHeader>
+                        <CardContent>
+                            <form onSubmit={handleSubmit} className="space-y-4">
+                                {formError && (
+                                    <div className="p-3 bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 rounded-md text-sm">
+                                        {formError}
+                                    </div>
+                                )}
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="name">Nazwa wyszukiwania *</Label>
+                                    <Input
+                                        id="name"
+                                        value={formData.name}
+                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                        placeholder="np. Audi A4 Kraków"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="serviceId">Serwis *</Label>
+                                    <select
+                                        id="serviceId"
+                                        value={formData.serviceId}
+                                        onChange={(e) => setFormData({ ...formData, serviceId: e.target.value })}
+                                        className="w-full px-3 py-2 border rounded-md bg-background"
+                                        required
+                                    >
+                                        <option value="">Wybierz serwis...</option>
+                                        {services.map(service => (
+                                            <option key={service.id} value={service.id}>
+                                                {service.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {services.length === 0 && (
+                                        <p className="text-xs text-muted-foreground">
+                                            Najpierw subskrybuj serwis w zakładce "Serwisy"
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="keywords">Słowa kluczowe</Label>
+                                    <Input
+                                        id="keywords"
+                                        value={formData.keywords}
+                                        onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
+                                        placeholder="audi, a4, kombi (oddziel przecinkami)"
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        Oddziel słowa kluczowe przecinkami
+                                    </p>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="priceMin">Cena min (PLN)</Label>
+                                        <Input
+                                            id="priceMin"
+                                            type="number"
+                                            min="0"
+                                            value={formData.priceMin}
+                                            onChange={(e) => setFormData({ ...formData, priceMin: e.target.value })}
+                                            placeholder="np. 10000"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="priceMax">Cena max (PLN)</Label>
+                                        <Input
+                                            id="priceMax"
+                                            type="number"
+                                            min="0"
+                                            value={formData.priceMax}
+                                            onChange={(e) => setFormData({ ...formData, priceMax: e.target.value })}
+                                            placeholder="np. 50000"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="location">Lokalizacja</Label>
+                                    <Input
+                                        id="location"
+                                        value={formData.location}
+                                        onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                                        placeholder="np. Kraków"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="intervalMinutes">Częstotliwość sprawdzania (minuty)</Label>
+                                    <select
+                                        id="intervalMinutes"
+                                        value={formData.intervalMinutes}
+                                        onChange={(e) => setFormData({ ...formData, intervalMinutes: e.target.value })}
+                                        className="w-full px-3 py-2 border rounded-md bg-background"
+                                    >
+                                        <option value="5">Co 5 minut</option>
+                                        <option value="15">Co 15 minut</option>
+                                        <option value="30">Co 30 minut</option>
+                                        <option value="60">Co godzinę</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex gap-2 pt-4">
+                                    <Button type="submit" disabled={formLoading} className="flex-1">
+                                        {formLoading ? 'Tworzenie...' : 'Utwórz wyszukiwanie'}
+                                    </Button>
+                                    <Button type="button" variant="outline" onClick={closeModal}>
+                                        Anuluj
+                                    </Button>
+                                </div>
+                            </form>
+                        </CardContent>
+                    </Card>
+                </div>
             )}
         </div>
     )
