@@ -26,12 +26,13 @@ export const createSearchConfigSchema = z.object({
     serviceId: z.string().uuid(),
     name: z.string().min(1).max(100),
     keywords: z.array(z.string()).default([]),
-    priceMin: z.number().int().positive().optional(),
-    priceMax: z.number().int().positive().optional(),
-    location: z.string().max(100).optional(),
+    priceMin: z.number().int().positive().nullable().optional(),
+    priceMax: z.number().int().positive().nullable().optional(),
+    location: z.string().max(100).nullable().optional(),
     customFilters: z.record(z.any()).optional(),
     intervalSeconds: z.number().int().min(30).max(86400).default(60),
     randomRangeSeconds: z.number().int().min(0).max(300).default(15),
+    isActive: z.boolean().optional(),
 });
 
 export const updateSearchConfigSchema = createSearchConfigSchema.partial().omit({ serviceId: true });

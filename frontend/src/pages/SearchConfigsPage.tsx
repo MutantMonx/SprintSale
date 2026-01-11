@@ -209,7 +209,9 @@ export default function SearchConfigsPage() {
             closeModal()
             loadConfigs()
         } catch (error: any) {
-            setFormError(error.response?.data?.error || 'Nie udało się utworzyć wyszukiwania')
+            const errData = error.response?.data?.error
+            const errMessage = typeof errData === 'string' ? errData : (errData?.message || 'Nie udało się utworzyć wyszukiwania')
+            setFormError(errMessage)
         } finally {
             setFormLoading(false)
         }
