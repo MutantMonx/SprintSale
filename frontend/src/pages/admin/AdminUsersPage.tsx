@@ -6,11 +6,15 @@ import {
     Shield,
     Trash2,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    Plus,
+    Edit,
+    X
 } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { adminApi } from '@/lib/api'
 
 interface User {
@@ -36,12 +40,37 @@ interface Pagination {
     pages: number
 }
 
+interface UserFormData {
+    email: string
+    password: string
+    name: string
+    tier: 'FREE' | 'PREMIUM'
+    isAdmin: boolean
+    emailVerified: boolean
+}
+
+const defaultFormData: UserFormData = {
+    email: '',
+    password: '',
+    name: '',
+    tier: 'FREE',
+    isAdmin: false,
+    emailVerified: false
+}
+
 export default function AdminUsersPage() {
     const [users, setUsers] = useState<User[]>([])
     const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 20, total: 0, pages: 0 })
     const [search, setSearch] = useState('')
     const [tierFilter, setTierFilter] = useState('')
     const [loading, setLoading] = useState(true)
+
+    // Modal state
+    const [showModal, setShowModal] = useState(false)
+    const [editingUser, setEditingUser] = useState<User | null>(null)
+    const [formData, setFormData] = useState<UserFormData>(defaultFormData)
+    const [formError, setFormError] = useState('')
+    const [formLoading, setFormLoading] = useState(false)
 
     useEffect(() => {
         loadUsers()
@@ -101,6 +130,75 @@ export default function AdminUsersPage() {
         }
     }
 
+    const openCreateModal = () => {
+        setEditingUser(null)
+        setFormData(defaultFormData)
+        setFormError('')
+        setShowModal(true)
+    }
+
+    const openEditModal = (user: User) => {
+        setEditingUser(user)
+        setFormData({
+            email: user.email,
+            password: '', // Don't show password
+            name: user.name || '',
+            tier: user.tier as 'FREE' | 'PREMIUM',
+            isAdmin: user.isAdmin,
+            emailVerified: user.emailVerified
+        })
+        setFormError('')
+        setShowModal(true)
+    }
+
+    const closeModal = () => {
+        setShowModal(false)
+        setEditingUser(null)
+        setFormData(defaultFormData)
+        setFormError('')
+    }
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setFormError('')
+        setFormLoading(true)
+
+        try {
+            if (editingUser) {
+                // Update existing user - don't send password if empty
+                const updateData: Record<string, unknown> = {
+                    name: formData.name || null,
+                    tier: formData.tier,
+                    isAdmin: formData.isAdmin,
+                    emailVerified: formData.emailVerified
+                }
+                await adminApi.users.update(editingUser.id, updateData)
+            } else {
+                // Create new user
+                if (!formData.email || !formData.password) {
+                    setFormError('Email i hasło są wymagane')
+                    setFormLoading(false)
+                    return
+                }
+                await adminApi.users.create({
+                    email: formData.email,
+                    password: formData.password,
+                    name: formData.name || undefined,
+                    tier: formData.tier,
+                    isAdmin: formData.isAdmin,
+                    emailVerified: formData.emailVerified
+                })
+            }
+            closeModal()
+            loadUsers()
+        } catch (err: unknown) {
+            const error = err as { response?: { data?: { error?: string } } }
+            setFormError(error.response?.data?.error || 'Wystąpił błąd')
+        } finally {
+            setFormLoading(false)
+        }
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -113,6 +211,10 @@ export default function AdminUsersPage() {
                         {pagination.total} użytkowników w systemie
                     </p>
                 </div>
+                <Button onClick={openCreateModal}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Dodaj użytkownika
+                </Button>
             </div>
 
             {/* Filters */}
@@ -219,6 +321,14 @@ export default function AdminUsersPage() {
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
+                                                        onClick={() => openEditModal(user)}
+                                                        title="Edytuj"
+                                                    >
+                                                        <Edit className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
                                                         onClick={() => handleToggleTier(user)}
                                                         title={user.tier === 'PREMIUM' ? 'Zmień na Free' : 'Zmień na Premium'}
                                                     >
@@ -277,6 +387,108 @@ export default function AdminUsersPage() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* User Modal */}
+            {showModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <Card className="w-full max-w-md mx-4">
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <CardTitle>
+                                {editingUser ? 'Edytuj użytkownika' : 'Nowy użytkownik'}
+                            </CardTitle>
+                            <Button variant="ghost" size="sm" onClick={closeModal}>
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </CardHeader>
+                        <CardContent>
+                            <form onSubmit={handleSubmit} className="space-y-4">
+                                {formError && (
+                                    <div className="p-3 bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 rounded-md text-sm">
+                                        {formError}
+                                    </div>
+                                )}
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="email">Email</Label>
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        value={formData.email}
+                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                        disabled={!!editingUser}
+                                        required={!editingUser}
+                                    />
+                                </div>
+
+                                {!editingUser && (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="password">Hasło</Label>
+                                        <Input
+                                            id="password"
+                                            type="password"
+                                            value={formData.password}
+                                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                            required={!editingUser}
+                                        />
+                                    </div>
+                                )}
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="name">Nazwa</Label>
+                                    <Input
+                                        id="name"
+                                        value={formData.name}
+                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="tier">Plan</Label>
+                                    <select
+                                        id="tier"
+                                        value={formData.tier}
+                                        onChange={(e) => setFormData({ ...formData, tier: e.target.value as 'FREE' | 'PREMIUM' })}
+                                        className="w-full px-3 py-2 border rounded-md bg-background"
+                                    >
+                                        <option value="FREE">Free</option>
+                                        <option value="PREMIUM">Premium</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex gap-4">
+                                    <label className="flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.isAdmin}
+                                            onChange={(e) => setFormData({ ...formData, isAdmin: e.target.checked })}
+                                            className="rounded"
+                                        />
+                                        <span className="text-sm">Administrator</span>
+                                    </label>
+                                    <label className="flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.emailVerified}
+                                            onChange={(e) => setFormData({ ...formData, emailVerified: e.target.checked })}
+                                            className="rounded"
+                                        />
+                                        <span className="text-sm">Email zweryfikowany</span>
+                                    </label>
+                                </div>
+
+                                <div className="flex gap-2 pt-4">
+                                    <Button type="submit" disabled={formLoading} className="flex-1">
+                                        {formLoading ? 'Zapisywanie...' : (editingUser ? 'Zapisz zmiany' : 'Utwórz użytkownika')}
+                                    </Button>
+                                    <Button type="button" variant="outline" onClick={closeModal}>
+                                        Anuluj
+                                    </Button>
+                                </div>
+                            </form>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
         </div>
     )
 }

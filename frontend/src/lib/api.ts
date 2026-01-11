@@ -145,6 +145,8 @@ export const adminApi = {
         list: (params?: { page?: number; limit?: number; search?: string; tier?: string }) =>
             api.get('/admin/users', { params }),
         get: (id: string) => api.get(`/admin/users/${id}`),
+        create: (data: { email: string; password: string; name?: string; tier?: string; isAdmin?: boolean; emailVerified?: boolean }) =>
+            api.post('/admin/users', data),
         update: (id: string, data: object) => api.put(`/admin/users/${id}`, data),
         delete: (id: string) => api.delete(`/admin/users/${id}`),
     },

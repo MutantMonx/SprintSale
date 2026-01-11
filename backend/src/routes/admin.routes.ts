@@ -178,6 +178,58 @@ router.get('/users/:id', async (req: AuthRequest, res: Response, next) => {
     }
 });
 
+// Create a new user from admin panel
+router.post('/users', async (req: AuthRequest, res: Response, next) => {
+    try {
+        const { email, password, name, tier, isAdmin, planId, emailVerified } = req.body;
+
+        if (!email || !password) {
+            throw new ValidationError('Email and password are required');
+        }
+
+        // Check if user already exists
+        const existing = await prisma.user.findUnique({
+            where: { email },
+        });
+
+        if (existing) {
+            throw new ValidationError('User with this email already exists');
+        }
+
+        // Hash password
+        const bcrypt = await import('bcrypt');
+        const passwordHash = await bcrypt.hash(password, 12);
+
+        // If tier is set, find corresponding plan
+        let resolvedPlanId = planId;
+        if (!planId && tier) {
+            const plan = await prisma.subscriptionPlan.findUnique({
+                where: { name: tier },
+            });
+            if (plan) {
+                resolvedPlanId = plan.id;
+            }
+        }
+
+        const user = await prisma.user.create({
+            data: {
+                email,
+                passwordHash,
+                name: name || null,
+                tier: tier || 'FREE',
+                isAdmin: isAdmin || false,
+                emailVerified: emailVerified || false,
+                planId: resolvedPlanId || null,
+            },
+            include: { plan: true },
+        });
+
+        res.status(201).json({ success: true, data: user });
+    } catch (error) {
+        next(error);
+    }
+});
+
 router.put('/users/:id', async (req: AuthRequest, res: Response, next) => {
     try {
         const { name, tier, isAdmin, planId } = req.body;
