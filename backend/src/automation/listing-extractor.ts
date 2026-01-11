@@ -74,17 +74,33 @@ const EXTRACTORS: Record<string, ListingExtractorConfig> = {
             externalId: { selector: 'article', attribute: 'data-id' },
         },
     },
+    autoplac: {
+        containerSelector: '.offer-item, .car-item, article.listing',
+        fields: {
+            title: { selector: 'h2 a, .title a, .offer-title' },
+            price: { selector: '.price, .offer-price', regex: '([\\d\\s]+)' },
+            location: { selector: '.location, .offer-location' },
+            link: { selector: 'a[href*="/oferta/"], h2 a, .title a', attribute: 'href' },
+            image: { selector: 'img', attribute: 'src' },
+            externalId: { selector: '[data-id], article', attribute: 'data-id' },
+        },
+    },
 };
 
 export async function extractListings(
     page: Page,
     serviceName: string
 ): Promise<ExtractedListing[]> {
-    const configKey = serviceName.toLowerCase().replace(/[^a-z]/g, '');
+    // Normalize service name: "OLX.pl" -> "olx", "OTOMOTO.pl" -> "otomoto"
+    const configKey = serviceName
+        .toLowerCase()
+        .replace(/\.pl$/i, '')  // Remove .pl suffix
+        .replace(/\.com$/i, '') // Remove .com suffix  
+        .replace(/[^a-z]/g, ''); // Remove any remaining non-letter chars
     const config = EXTRACTORS[configKey];
 
     if (!config) {
-        logger.warn(`No extractor config for service: ${serviceName}`);
+        logger.warn(`No extractor config for service: ${serviceName} (key: ${configKey})`);
         return [];
     }
 
