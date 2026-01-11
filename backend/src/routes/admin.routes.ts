@@ -119,6 +119,14 @@ router.get('/users', async (req: AuthRequest, res: Response, next) => {
                     emailVerified: true,
                     createdAt: true,
                     updatedAt: true,
+                    // Granular permissions
+                    customMaxServices: true,
+                    customMaxSearchConfigs: true,
+                    customMaxNotificationsDay: true,
+                    customDailySearchMinutes: true,
+                    canAddCustomService: true,
+                    allowedServiceIds: true,
+                    notes: true,
                     plan: { select: { name: true, displayName: true } },
                     _count: {
                         select: {

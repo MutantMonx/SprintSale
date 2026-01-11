@@ -33,20 +33,21 @@ const EXTRACTORS: Record<string, ListingExtractorConfig> = {
     olx: {
         containerSelector: '[data-cy="l-card"]',
         fields: {
-            title: { selector: 'h6', attribute: undefined },
+            title: { selector: 'h4, h6', attribute: undefined },
             price: { selector: '[data-testid="ad-price"]', regex: '([\\d\\s]+)' },
             location: { selector: '[data-testid="location-date"]' },
             link: { selector: 'a', attribute: 'href' },
             image: { selector: 'img', attribute: 'src' },
-            externalId: { selector: 'a', attribute: 'href', regex: '/oferta/([^/]+)' },
+            externalId: { selector: 'a', attribute: 'href', regex: '/d/oferta/([^/]+)|/oferta/([^/]+)' },
         },
     },
     otomoto: {
-        containerSelector: 'article[data-id]',
+        // OTOMOTO listings are now embedded in OLX with same structure
+        containerSelector: '[data-cy="l-card"], article[data-id], [data-testid="listing-ad"]',
         fields: {
-            title: { selector: 'h1, h2', attribute: undefined },
-            price: { selector: '[data-testid="listing-price"]', regex: '([\\d\\s]+)' },
-            location: { selector: '[data-testid="location"]' },
+            title: { selector: 'h4, h1, h2', attribute: undefined },
+            price: { selector: '[data-testid="ad-price"], [data-testid="listing-price"]', regex: '([\\d\\s]+)' },
+            location: { selector: '[data-testid="location-date"], [data-testid="location"]' },
             link: { selector: 'a', attribute: 'href' },
             image: { selector: 'img', attribute: 'src' },
             externalId: { selector: 'article', attribute: 'data-id' },
