@@ -6,26 +6,36 @@ const prisma = new PrismaClient();
 async function main() {
     console.log('🌱 Starting database seed...');
 
-    // Create admin user
+    // Create admin user (using regular User with isAdmin flag)
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@sprintsale.local';
     const adminPassword = process.env.ADMIN_PASSWORD || 'ChangeMe123!';
 
-    const existingAdmin = await prisma.adminUser.findUnique({
+    const existingUser = await prisma.user.findUnique({
         where: { email: adminEmail },
     });
 
-    if (!existingAdmin) {
+    if (!existingUser) {
         const passwordHash = await bcrypt.hash(adminPassword, 12);
 
-        await prisma.adminUser.create({
+        await prisma.user.create({
             data: {
                 email: adminEmail,
                 passwordHash,
                 name: 'Administrator',
+                tier: 'PREMIUM',
+                isAdmin: true,
+                emailVerified: true,
             },
         });
 
         console.log(`✅ Admin user created: ${adminEmail}`);
+    } else if (!existingUser.isAdmin) {
+        // Update existing user to be admin
+        await prisma.user.update({
+            where: { email: adminEmail },
+            data: { isAdmin: true, tier: 'PREMIUM' },
+        });
+        console.log(`✅ Admin user updated: ${adminEmail} (set isAdmin: true)`);
     } else {
         console.log(`ℹ️  Admin user already exists: ${adminEmail}`);
     }
