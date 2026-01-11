@@ -1,4 +1,5 @@
 # backend/Dockerfile
+# API Server (without Playwright - worker handles browser automation)
 
 # --- Stage 1: Builder ---
 FROM node:20-slim AS builder
