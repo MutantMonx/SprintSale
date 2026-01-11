@@ -2,15 +2,13 @@ import { useState, useEffect } from 'react'
 import {
     Users,
     Search,
-    MoreVertical,
     Crown,
     Shield,
     Trash2,
-    Edit,
     ChevronLeft,
     ChevronRight
 } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { adminApi } from '@/lib/api'
@@ -44,8 +42,6 @@ export default function AdminUsersPage() {
     const [search, setSearch] = useState('')
     const [tierFilter, setTierFilter] = useState('')
     const [loading, setLoading] = useState(true)
-    const [selectedUser, setSelectedUser] = useState<User | null>(null)
-    const [showEditModal, setShowEditModal] = useState(false)
 
     useEffect(() => {
         loadUsers()
@@ -184,7 +180,7 @@ export default function AdminUsersPage() {
                                                     <div className="font-medium flex items-center gap-2">
                                                         {user.email}
                                                         {user.isAdmin && (
-                                                            <Shield className="h-4 w-4 text-blue-500" title="Admin" />
+                                                            <Shield className="h-4 w-4 text-blue-500" aria-label="Admin" />
                                                         )}
                                                     </div>
                                                     <div className="text-sm text-muted-foreground">
@@ -194,8 +190,8 @@ export default function AdminUsersPage() {
                                             </td>
                                             <td className="p-4">
                                                 <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${user.tier === 'PREMIUM'
-                                                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
-                                                        : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
+                                                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
+                                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
                                                     }`}>
                                                     {user.tier === 'PREMIUM' && <Crown className="h-3 w-3" />}
                                                     {user.plan?.displayName || user.tier}
@@ -203,8 +199,8 @@ export default function AdminUsersPage() {
                                             </td>
                                             <td className="p-4">
                                                 <span className={`px-2 py-1 rounded-full text-xs ${user.emailVerified
-                                                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                                                        : 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300'
+                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                                                    : 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300'
                                                     }`}>
                                                     {user.emailVerified ? 'Zweryfikowany' : 'Niezweryfikowany'}
                                                 </span>
