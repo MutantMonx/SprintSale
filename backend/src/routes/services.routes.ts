@@ -33,6 +33,50 @@ router.get('/', async (req, res: Response, next) => {
     }
 });
 
+// Get user's subscribed services (MUST be before /:id route!)
+router.get(
+    '/subscribed',
+    authenticate,
+    async (req: AuthRequest, res: Response, next) => {
+        try {
+            const subscriptions = await prisma.userService.findMany({
+                where: {
+                    userId: req.user!.id,
+                    isActive: true,
+                },
+                include: {
+                    service: {
+                        select: {
+                            id: true,
+                            name: true,
+                            baseUrl: true,
+                            logoUrl: true,
+                        },
+                    },
+                    credentials: {
+                        select: {
+                            id: true,
+                            createdAt: true,
+                            updatedAt: true,
+                        },
+                    },
+                },
+            });
+
+            res.json({
+                success: true,
+                data: subscriptions.map(sub => ({
+                    ...sub.service,
+                    hasCredentials: !!sub.credentials,
+                    subscribedAt: sub.createdAt,
+                })),
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+);
+
 // Get service details
 router.get(
     '/:id',
@@ -208,50 +252,6 @@ router.post(
             res.json({
                 success: true,
                 message: 'Credentials stored securely',
-            });
-        } catch (error) {
-            next(error);
-        }
-    }
-);
-
-// Get user's subscribed services
-router.get(
-    '/subscribed',
-    authenticate,
-    async (req: AuthRequest, res: Response, next) => {
-        try {
-            const subscriptions = await prisma.userService.findMany({
-                where: {
-                    userId: req.user!.id,
-                    isActive: true,
-                },
-                include: {
-                    service: {
-                        select: {
-                            id: true,
-                            name: true,
-                            baseUrl: true,
-                            logoUrl: true,
-                        },
-                    },
-                    credentials: {
-                        select: {
-                            id: true,
-                            createdAt: true,
-                            updatedAt: true,
-                        },
-                    },
-                },
-            });
-
-            res.json({
-                success: true,
-                data: subscriptions.map(sub => ({
-                    ...sub.service,
-                    hasCredentials: !!sub.credentials,
-                    subscribedAt: sub.createdAt,
-                })),
             });
         } catch (error) {
             next(error);
