@@ -15,6 +15,8 @@ import SettingsPage from '@/pages/SettingsPage'
 import AdminDashboardPage from '@/pages/admin/AdminDashboardPage'
 import AdminUsersPage from '@/pages/admin/AdminUsersPage'
 import AdminPlansPage from '@/pages/admin/AdminPlansPage'
+import AdminServicesPage from '@/pages/admin/AdminServicesPage'
+import AdminPaymentsPage from '@/pages/admin/AdminPaymentsPage'
 import AdminSettingsPage from '@/pages/admin/AdminSettingsPage'
 import AdminPaymentProvidersPage from '@/pages/admin/AdminPaymentProvidersPage'
 import AdminLegalPage from '@/pages/admin/AdminLegalPage'
@@ -87,10 +89,12 @@ export default function App() {
                     <Route path="/notifications" element={<NotificationsPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
 
-                    {/* Admin routes - protected by AdminRoute component inside Layout */}
+                    {/* Admin routes */}
                     <Route path="/admin" element={<AdminDashboardPage />} />
                     <Route path="/admin/users" element={<AdminUsersPage />} />
                     <Route path="/admin/plans" element={<AdminPlansPage />} />
+                    <Route path="/admin/services" element={<AdminServicesPage />} />
+                    <Route path="/admin/payments" element={<AdminPaymentsPage />} />
                     <Route path="/admin/settings" element={<AdminSettingsPage />} />
                     <Route path="/admin/payment-providers" element={<AdminPaymentProvidersPage />} />
                     <Route path="/admin/legal" element={<AdminLegalPage />} />
