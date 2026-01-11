@@ -1,7 +1,7 @@
 # backend/Dockerfile.worker
 
 # Use official Playwright image (includes Node.js + Browsers)
-FROM mcr.microsoft.com/playwright:v1.41.0-jammy
+FROM mcr.microsoft.com/playwright:v1.57.0-jammy
 
 WORKDIR /app
 
