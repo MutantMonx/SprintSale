@@ -30,7 +30,7 @@ export const createSearchConfigSchema = z.object({
     priceMax: z.number().int().positive().nullable().optional(),
     location: z.string().max(100).nullable().optional(),
     customFilters: z.record(z.any()).optional(),
-    intervalSeconds: z.number().int().min(30).max(86400).default(60),
+    intervalSeconds: z.number().int().min(30).max(86400).default(300),
     randomRangeSeconds: z.number().int().min(0).max(300).default(15),
     isActive: z.boolean().optional(),
 });

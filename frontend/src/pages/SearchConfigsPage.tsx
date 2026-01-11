@@ -6,7 +6,8 @@ import {
     Pause,
     Trash2,
     Clock,
-    X
+    X,
+    Edit
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -69,6 +70,7 @@ export default function SearchConfigsPage() {
 
     // Modal state
     const [showModal, setShowModal] = useState(false)
+    const [editingConfig, setEditingConfig] = useState<SearchConfig | null>(null)
     const [formData, setFormData] = useState<FormData>(defaultFormData)
     const [formLoading, setFormLoading] = useState(false)
     const [formError, setFormError] = useState('')
@@ -160,14 +162,31 @@ export default function SearchConfigsPage() {
         }
     }
 
-    const openModal = () => {
+    const openCreateModal = () => {
+        setEditingConfig(null)
         setFormData(defaultFormData)
+        setFormError('')
+        setShowModal(true)
+    }
+
+    const openEditModal = (config: SearchConfig) => {
+        setEditingConfig(config)
+        setFormData({
+            name: config.name,
+            serviceId: config.service.id,
+            keywords: config.keywords.join(', '),
+            priceMin: config.priceMin?.toString() || '',
+            priceMax: config.priceMax?.toString() || '',
+            location: config.location || '',
+            intervalMinutes: String(Math.round(config.intervalSeconds / 60))
+        })
         setFormError('')
         setShowModal(true)
     }
 
     const closeModal = () => {
         setShowModal(false)
+        setEditingConfig(null)
         setFormData(defaultFormData)
         setFormError('')
     }
@@ -178,8 +197,8 @@ export default function SearchConfigsPage() {
         setFormLoading(true)
 
         try {
-            if (!formData.name || !formData.serviceId) {
-                setFormError('Nazwa i serwis są wymagane')
+            if (!formData.name) {
+                setFormError('Nazwa jest wymagana')
                 setFormLoading(false)
                 return
             }
@@ -189,28 +208,46 @@ export default function SearchConfigsPage() {
                 .map(k => k.trim())
                 .filter(k => k.length > 0)
 
-            await searchConfigsApi.create({
+            const payload = {
                 name: formData.name,
-                serviceId: formData.serviceId,
                 keywords,
                 priceMin: formData.priceMin ? parseFloat(formData.priceMin) : null,
                 priceMax: formData.priceMax ? parseFloat(formData.priceMax) : null,
                 location: formData.location || null,
                 intervalSeconds: (parseInt(formData.intervalMinutes) || 5) * 60,
-                isActive: true
-            })
+            }
 
-            toast({
-                title: 'Wyszukiwanie utworzone',
-                description: 'Twoje nowe wyszukiwanie zostało dodane',
-                variant: 'success'
-            })
+            if (editingConfig) {
+                // Update existing
+                await searchConfigsApi.update(editingConfig.id, payload)
+                toast({
+                    title: 'Wyszukiwanie zaktualizowane',
+                    variant: 'success'
+                })
+            } else {
+                // Create new
+                if (!formData.serviceId) {
+                    setFormError('Serwis jest wymagany')
+                    setFormLoading(false)
+                    return
+                }
+                await searchConfigsApi.create({
+                    ...payload,
+                    serviceId: formData.serviceId,
+                    isActive: true
+                })
+                toast({
+                    title: 'Wyszukiwanie utworzone',
+                    description: 'Twoje nowe wyszukiwanie zostało dodane',
+                    variant: 'success'
+                })
+            }
 
             closeModal()
             loadConfigs()
         } catch (error: any) {
             const errData = error.response?.data?.error
-            const errMessage = typeof errData === 'string' ? errData : (errData?.message || 'Nie udało się utworzyć wyszukiwania')
+            const errMessage = typeof errData === 'string' ? errData : (errData?.message || 'Nie udało się zapisać wyszukiwania')
             setFormError(errMessage)
         } finally {
             setFormLoading(false)
@@ -227,7 +264,7 @@ export default function SearchConfigsPage() {
                     </p>
                 </div>
 
-                <Button onClick={openModal}>
+                <Button onClick={openCreateModal}>
                     <Plus className="w-4 h-4 mr-2" />
                     Nowe wyszukiwanie
                 </Button>
@@ -305,8 +342,18 @@ export default function SearchConfigsPage() {
                                         <Button
                                             variant="outline"
                                             size="sm"
+                                            onClick={() => openEditModal(config)}
+                                            title="Edytuj"
+                                        >
+                                            <Edit className="w-4 h-4" />
+                                        </Button>
+
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
                                             onClick={() => handleRun(config.id)}
                                             disabled={actionLoading === config.id || !config.isActive}
+                                            title="Uruchom teraz"
                                         >
                                             <Play className="w-4 h-4" />
                                         </Button>
@@ -352,7 +399,7 @@ export default function SearchConfigsPage() {
                         <p className="text-muted-foreground mb-4">
                             Utwórz swoje pierwsze wyszukiwanie, aby zacząć śledzić ogłoszenia
                         </p>
-                        <Button onClick={openModal}>
+                        <Button onClick={openCreateModal}>
                             <Plus className="w-4 h-4 mr-2" />
                             Nowe wyszukiwanie
                         </Button>
@@ -360,12 +407,12 @@ export default function SearchConfigsPage() {
                 </Card>
             )}
 
-            {/* Create Search Modal */}
+            {/* Create/Edit Search Modal */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <Card className="w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
                         <CardHeader className="flex flex-row items-center justify-between">
-                            <CardTitle>Nowe wyszukiwanie</CardTitle>
+                            <CardTitle>{editingConfig ? 'Edytuj wyszukiwanie' : 'Nowe wyszukiwanie'}</CardTitle>
                             <Button variant="ghost" size="sm" onClick={closeModal}>
                                 <X className="h-4 w-4" />
                             </Button>
@@ -389,28 +436,36 @@ export default function SearchConfigsPage() {
                                     />
                                 </div>
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="serviceId">Serwis *</Label>
-                                    <select
-                                        id="serviceId"
-                                        value={formData.serviceId}
-                                        onChange={(e) => setFormData({ ...formData, serviceId: e.target.value })}
-                                        className="w-full px-3 py-2 border rounded-md bg-background"
-                                        required
-                                    >
-                                        <option value="">Wybierz serwis...</option>
-                                        {services.map(service => (
-                                            <option key={service.id} value={service.id}>
-                                                {service.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {services.length === 0 && (
-                                        <p className="text-xs text-muted-foreground">
-                                            Najpierw subskrybuj serwis w zakładce "Serwisy"
-                                        </p>
-                                    )}
-                                </div>
+                                {!editingConfig && (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="serviceId">Serwis *</Label>
+                                        <select
+                                            id="serviceId"
+                                            value={formData.serviceId}
+                                            onChange={(e) => setFormData({ ...formData, serviceId: e.target.value })}
+                                            className="w-full px-3 py-2 border rounded-md bg-background"
+                                            required
+                                        >
+                                            <option value="">Wybierz serwis...</option>
+                                            {services.map(service => (
+                                                <option key={service.id} value={service.id}>
+                                                    {service.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {services.length === 0 && (
+                                            <p className="text-xs text-muted-foreground">
+                                                Najpierw subskrybuj serwis w zakładce "Serwisy"
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {editingConfig && (
+                                    <div className="text-sm text-muted-foreground bg-muted p-2 rounded">
+                                        Serwis: <strong>{editingConfig.service.name}</strong>
+                                    </div>
+                                )}
 
                                 <div className="space-y-2">
                                     <Label htmlFor="keywords">Słowa kluczowe</Label>
@@ -461,13 +516,14 @@ export default function SearchConfigsPage() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="intervalMinutes">Częstotliwość sprawdzania (minuty)</Label>
+                                    <Label htmlFor="intervalMinutes">Częstotliwość sprawdzania</Label>
                                     <select
                                         id="intervalMinutes"
                                         value={formData.intervalMinutes}
                                         onChange={(e) => setFormData({ ...formData, intervalMinutes: e.target.value })}
                                         className="w-full px-3 py-2 border rounded-md bg-background"
                                     >
+                                        <option value="1">Co 1 minutę</option>
                                         <option value="5">Co 5 minut</option>
                                         <option value="15">Co 15 minut</option>
                                         <option value="30">Co 30 minut</option>
@@ -477,7 +533,7 @@ export default function SearchConfigsPage() {
 
                                 <div className="flex gap-2 pt-4">
                                     <Button type="submit" disabled={formLoading} className="flex-1">
-                                        {formLoading ? 'Tworzenie...' : 'Utwórz wyszukiwanie'}
+                                        {formLoading ? 'Zapisywanie...' : (editingConfig ? 'Zapisz zmiany' : 'Utwórz wyszukiwanie')}
                                     </Button>
                                     <Button type="button" variant="outline" onClick={closeModal}>
                                         Anuluj
