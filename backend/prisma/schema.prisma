@@ -26,9 +26,14 @@ model User {
   name          String?
   tier          UserTier  @default(FREE)
   emailVerified Boolean   @default(false) @map("email_verified")
+  isAdmin       Boolean   @default(false) @map("is_admin")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
   deletedAt     DateTime? @map("deleted_at")
+
+  // Subscription
+  planId        String?   @map("plan_id")
+  plan          SubscriptionPlan? @relation(fields: [planId], references: [id])
 
   // Relations
   userServices   UserService[]
@@ -37,6 +42,8 @@ model User {
   mobileDevices  MobileDevice[]
   auditLogs      AuditLog[]
   refreshTokens  RefreshToken[]
+  subscriptions  Subscription[]
+  dailyUsage     DailyUsage[]
 
   @@map("users")
 }
@@ -343,3 +350,227 @@ model AuditLog {
   @@index([createdAt])
   @@map("audit_logs")
 }
+
+// ============================================================================
+// SUBSCRIPTION PLANS
+// ============================================================================
+
+enum BillingPeriod {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+model SubscriptionPlan {
+  id                  String        @id @default(uuid())
+  name                String        @unique  // FREE, PREMIUM
+  displayName         String        @map("display_name")  // "Darmowy", "Premium"
+  description         String?
+  
+  // Pricing
+  priceMonthly        Decimal       @default(0) @map("price_monthly")
+  priceQuarterly      Decimal       @default(0) @map("price_quarterly")
+  priceYearly         Decimal       @default(0) @map("price_yearly")
+  currency            String        @default("PLN")
+  
+  // Limits
+  maxServices         Int           @default(1) @map("max_services")
+  maxCustomServices   Int           @default(0) @map("max_custom_services")
+  maxSearchConfigs    Int           @default(1) @map("max_search_configs")
+  dailySearchMinutes  Int           @default(120) @map("daily_search_minutes")  // 2h = 120min, 0 = unlimited
+  maxNotificationsDay Int           @default(2) @map("max_notifications_day")   // 0 = unlimited
+  
+  // Features
+  canAddCustomService Boolean       @default(false) @map("can_add_custom_service")
+  hasBonusService     Boolean       @default(false) @map("has_bonus_service")
+  hasEmailReports     Boolean       @default(false) @map("has_email_reports")
+  hasPrioritySupport  Boolean       @default(false) @map("has_priority_support")
+  
+  isActive            Boolean       @default(true) @map("is_active")
+  displayOrder        Int           @default(0) @map("display_order")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+  
+  // Relations
+  users               User[]
+  subscriptions       Subscription[]
+  
+  @@map("subscription_plans")
+}
+
+// ============================================================================
+// USER SUBSCRIPTIONS
+// ============================================================================
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE        // Payment overdue (grace period)
+  SUSPENDED       // Suspended after grace period
+  CANCELLED
+  EXPIRED
+}
+
+model Subscription {
+  id                  String             @id @default(uuid())
+  userId              String             @map("user_id")
+  planId              String             @map("plan_id")
+  billingPeriod       BillingPeriod      @default(MONTHLY) @map("billing_period")
+  
+  status              SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart  DateTime           @map("current_period_start")
+  currentPeriodEnd    DateTime           @map("current_period_end")
+  
+  // Payment tracking
+  lastPaymentDate     DateTime?          @map("last_payment_date")
+  nextPaymentDate     DateTime?          @map("next_payment_date")
+  gracePeriodEnds     DateTime?          @map("grace_period_ends")
+  
+  // Auto-renewal
+  autoRenew           Boolean            @default(true) @map("auto_renew")
+  cancelledAt         DateTime?          @map("cancelled_at")
+  cancellationReason  String?            @map("cancellation_reason")
+  
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+  
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan                SubscriptionPlan   @relation(fields: [planId], references: [id])
+  payments            Payment[]
+  
+  @@index([userId])
+  @@index([status])
+  @@index([currentPeriodEnd])
+  @@map("subscriptions")
+}
+
+// ============================================================================
+// PAYMENTS
+// ============================================================================
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum PaymentProvider {
+  PAYU
+  PAYPAL
+  GOOGLE_PAY
+  APPLE_PAY
+  STRIPE
+  MANUAL
+}
+
+model Payment {
+  id                  String          @id @default(uuid())
+  subscriptionId      String          @map("subscription_id")
+  
+  amount              Decimal
+  currency            String          @default("PLN")
+  status              PaymentStatus   @default(PENDING)
+  
+  provider            PaymentProvider
+  externalId          String?         @map("external_id")  // PayU/PayPal transaction ID
+  externalStatus      String?         @map("external_status")
+  
+  // Invoice
+  invoiceNumber       String?         @unique @map("invoice_number")
+  invoiceUrl          String?         @map("invoice_url")
+  
+  // Metadata
+  metadata            Json?
+  errorMessage        String?         @map("error_message")
+  
+  createdAt           DateTime        @default(now()) @map("created_at")
+  paidAt              DateTime?       @map("paid_at")
+  refundedAt          DateTime?       @map("refunded_at")
+  
+  subscription        Subscription    @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  
+  @@index([subscriptionId])
+  @@index([status])
+  @@index([externalId])
+  @@map("payments")
+}
+
+// ============================================================================
+// PAYMENT PROVIDER SETTINGS
+// ============================================================================
+
+model PaymentSettings {
+  id                  String          @id @default(uuid())
+  provider            PaymentProvider @unique
+  
+  isEnabled           Boolean         @default(false) @map("is_enabled")
+  isSandbox           Boolean         @default(true) @map("is_sandbox")
+  
+  // Credentials (encrypted)
+  clientId            String?         @map("client_id")
+  clientSecretEnc     Bytes?          @map("client_secret_enc")
+  merchantId          String?         @map("merchant_id")
+  posId               String?         @map("pos_id")  // PayU
+  secondKeyEnc        Bytes?          @map("second_key_enc")  // PayU
+  webhookSecretEnc    Bytes?          @map("webhook_secret_enc")
+  
+  // Additional config
+  config              Json?
+  
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+  
+  @@map("payment_settings")
+}
+
+// ============================================================================
+// APP SETTINGS
+// ============================================================================
+
+model AppSettings {
+  id                  String          @id @default(uuid())
+  key                 String          @unique
+  value               String          @db.Text
+  description         String?
+  isPublic            Boolean         @default(false) @map("is_public")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+  
+  @@map("app_settings")
+}
+
+// ============================================================================
+// LEGAL PAGES
+// ============================================================================
+
+model LegalPage {
+  id                  String          @id @default(uuid())
+  slug                String          @unique  // privacy-policy, terms-of-service
+  title               String
+  content             String          @db.Text
+  isPublished         Boolean         @default(true) @map("is_published")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+  
+  @@map("legal_pages")
+}
+
+// ============================================================================
+// DAILY USAGE TRACKING (for Free plan limits)
+// ============================================================================
+
+model DailyUsage {
+  id                  String          @id @default(uuid())
+  userId              String          @map("user_id")
+  date                DateTime        @db.Date
+  
+  searchMinutesUsed   Int             @default(0) @map("search_minutes_used")
+  notificationsSent   Int             @default(0) @map("notifications_sent")
+  
+  user                User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, date])
+  @@index([date])
+  @@map("daily_usage")
+}
+

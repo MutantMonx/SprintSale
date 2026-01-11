@@ -186,6 +186,8 @@ class AuthService {
     }
 
     private async generateTokens(user: User): Promise<AuthTokens> {
+        const tokenId = uuidv4(); // Unique ID for this token pair
+
         const accessPayload: JwtPayload = {
             userId: user.id,
             email: user.email,
@@ -206,13 +208,25 @@ class AuthService {
 
         const refreshToken = jwt.sign(refreshPayload, config.jwt.secret, {
             expiresIn: config.jwt.refreshExpiry,
+            jwtid: tokenId, // Ensures uniqueness
         });
 
         // Calculate expiry
         const expiresInMs = this.parseExpiry(config.jwt.refreshExpiry);
         const expiresAt = new Date(Date.now() + expiresInMs);
 
-        // Store refresh token
+        // Revoke any existing active refresh tokens for this user (prevent conflicts)
+        await prisma.refreshToken.updateMany({
+            where: {
+                userId: user.id,
+                revokedAt: null,
+            },
+            data: {
+                revokedAt: new Date(),
+            },
+        });
+
+        // Store refresh token with unique identifier
         await prisma.refreshToken.create({
             data: {
                 userId: user.id,
