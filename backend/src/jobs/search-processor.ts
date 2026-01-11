@@ -49,11 +49,15 @@ searchQueue.process(2, async (job: Job<SearchJobData>) => {
         session = await playwrightManager.acquire();
 
         // Build search URL based on service
-        const searchUrl = buildSearchUrl(serviceBaseUrl, keywords, priceMin, priceMax, location);
+        const searchUrl = buildSearchUrl(serviceName, serviceBaseUrl, keywords, priceMin, priceMax, location);
+        logger.info(`Navigating to: ${searchUrl}`);
 
         // Navigate and extract
-        await session.page.goto(searchUrl, { waitUntil: 'domcontentloaded' });
+        await session.page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
         await randomDelay(2000, 4000);
+
+        // Handle cookie consent popups
+        await handleCookieConsent(session.page);
 
         // Scroll to load lazy content
         await session.page.evaluate(() => window.scrollBy(0, 500));
@@ -170,22 +174,107 @@ async function processListings(
 }
 
 function buildSearchUrl(
+    serviceName: string,
     baseUrl: string,
     keywords: string[],
     priceMin: number | null,
     priceMax: number | null,
     location: string | null
 ): string {
-    const url = new URL(baseUrl);
     const keywordString = keywords.join(' ');
+    const serviceKey = serviceName.toLowerCase().replace(/\.pl$/i, '').replace(/\.com$/i, '').replace(/[^a-z]/g, '');
 
-    // Generic search params - services may need specific handling
-    if (keywordString) url.searchParams.set('q', keywordString);
-    if (priceMin) url.searchParams.set('price_from', String(priceMin));
-    if (priceMax) url.searchParams.set('price_to', String(priceMax));
-    if (location) url.searchParams.set('city', location);
+    // Service-specific URL formats
+    switch (serviceKey) {
+        case 'olx': {
+            // OLX format: https://www.olx.pl/oferty/q-keyword/?search[filter_float_price:from]=X&search[filter_float_price:to]=Y
+            let url = 'https://www.olx.pl/oferty/';
+            if (keywordString) {
+                url += `q-${encodeURIComponent(keywordString.replace(/\s+/g, '-'))}/`;
+            }
+            const params = new URLSearchParams();
+            if (priceMin) params.set('search[filter_float_price:from]', String(priceMin));
+            if (priceMax) params.set('search[filter_float_price:to]', String(priceMax));
+            if (location) params.set('search[city_name]', location);
+            const paramString = params.toString();
+            return paramString ? `${url}?${paramString}` : url;
+        }
 
-    return url.toString();
+        case 'otomoto': {
+            // OTOMOTO format: https://www.otomoto.pl/osobowe?search[filter_float_price:from]=X
+            let url = 'https://www.otomoto.pl/osobowe';
+            const params = new URLSearchParams();
+            if (keywordString) params.set('search[filter_string_search]', keywordString);
+            if (priceMin) params.set('search[filter_float_price:from]', String(priceMin));
+            if (priceMax) params.set('search[filter_float_price:to]', String(priceMax));
+            if (location) params.set('search[filter_enum_city]', location);
+            const paramString = params.toString();
+            return paramString ? `${url}?${paramString}` : url;
+        }
+
+        case 'allegro': {
+            // Allegro format: https://allegro.pl/listing?string=keyword&price_from=X&price_to=Y
+            const url = new URL('https://allegro.pl/listing');
+            if (keywordString) url.searchParams.set('string', keywordString);
+            if (priceMin) url.searchParams.set('price_from', String(priceMin));
+            if (priceMax) url.searchParams.set('price_to', String(priceMax));
+            return url.toString();
+        }
+
+        default: {
+            // Generic fallback using baseUrl
+            const url = new URL(baseUrl);
+            if (keywordString) url.searchParams.set('q', keywordString);
+            if (priceMin) url.searchParams.set('price_from', String(priceMin));
+            if (priceMax) url.searchParams.set('price_to', String(priceMax));
+            if (location) url.searchParams.set('city', location);
+            return url.toString();
+        }
+    }
+}
+
+async function handleCookieConsent(page: any): Promise<void> {
+    try {
+        // Try common cookie consent button selectors
+        const consentSelectors = [
+            'button:has-text("Akceptuję")',
+            'button:has-text("Zgadzam się")',
+            'button:has-text("Accept")',
+            'button:has-text("Zaakceptuj")',
+            '[data-testid="consent-accept"]',
+            '#onetrust-accept-btn-handler',
+            '.cookie-consent-accept',
+            'button[id*="accept"]',
+        ];
+
+        for (const selector of consentSelectors) {
+            try {
+                const button = await page.$(selector);
+                if (button) {
+                    await button.click();
+                    logger.debug('Cookie consent accepted');
+                    await randomDelay(500, 1000);
+                    return;
+                }
+            } catch {
+                // Selector not found, try next
+            }
+        }
+
+        // Also try clicking via JavaScript for stubborn popups
+        await page.evaluate(() => {
+            const buttons = Array.from(document.querySelectorAll('button'));
+            const acceptBtn = buttons.find(b =>
+                b.textContent?.includes('Akceptuję') ||
+                b.textContent?.includes('Accept') ||
+                b.textContent?.includes('Zgadzam')
+            );
+            if (acceptBtn) (acceptBtn as HTMLElement).click();
+        });
+    } catch (error) {
+        // Cookie consent handling is best-effort, don't fail the job
+        logger.debug('Cookie consent handling skipped:', error);
+    }
 }
 
 function calculateNextRun(jobData: SearchJobData): Date {
