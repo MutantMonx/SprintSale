@@ -11,7 +11,8 @@ import {
     LogOut,
     Menu,
     X,
-    ChevronDown
+    ChevronDown,
+    Shield
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth'
@@ -31,6 +32,10 @@ const navItems = [
     { to: '/listings', icon: FileText, label: 'Ogłoszenia' },
     { to: '/notifications', icon: Bell, label: 'Powiadomienia' },
     { to: '/settings', icon: Settings, label: 'Ustawienia' },
+]
+
+const adminNavItems = [
+    { to: '/admin', icon: Shield, label: 'Panel Admina' },
 ]
 
 export default function Layout() {
@@ -119,6 +124,34 @@ export default function Layout() {
                             {item.label}
                         </NavLink>
                     ))}
+
+                    {/* Admin section - only for admins */}
+                    {user?.isAdmin && (
+                        <>
+                            <div className="pt-4 pb-2">
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3">
+                                    Administracja
+                                </p>
+                            </div>
+                            {adminNavItems.map((item) => (
+                                <NavLink
+                                    key={item.to}
+                                    to={item.to}
+                                    onClick={() => setSidebarOpen(false)}
+                                    className={({ isActive }) => cn(
+                                        'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200',
+                                        'hover:bg-accent',
+                                        isActive
+                                            ? 'bg-blue-500/10 text-blue-500 font-medium'
+                                            : 'text-muted-foreground hover:text-foreground'
+                                    )}
+                                >
+                                    <item.icon className="w-5 h-5" />
+                                    {item.label}
+                                </NavLink>
+                            ))}
+                        </>
+                    )}
                 </nav>
 
                 {/* User section */}

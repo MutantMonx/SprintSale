@@ -118,3 +118,77 @@ export const devicesApi = {
     list: () => api.get('/devices'),
     unregister: (id: string) => api.delete(`/devices/${id}`),
 }
+
+// Subscription API
+export const subscriptionsApi = {
+    plans: () => api.get('/subscriptions/plans'),
+    current: () => api.get('/subscriptions/current'),
+    canPerform: (action: string) => api.get(`/subscriptions/can-perform/${action}`),
+    upgrade: (planId: string, billingPeriod?: string) =>
+        api.post('/subscriptions/upgrade', { planId, billingPeriod }),
+    cancel: (reason?: string) => api.post('/subscriptions/cancel', { reason }),
+}
+
+// Legal API (public)
+export const legalApi = {
+    list: () => api.get('/legal'),
+    get: (slug: string) => api.get(`/legal/${slug}`),
+}
+
+// Admin API
+export const adminApi = {
+    // Dashboard
+    dashboard: () => api.get('/admin/dashboard'),
+
+    // Users
+    users: {
+        list: (params?: { page?: number; limit?: number; search?: string; tier?: string }) =>
+            api.get('/admin/users', { params }),
+        get: (id: string) => api.get(`/admin/users/${id}`),
+        update: (id: string, data: object) => api.put(`/admin/users/${id}`, data),
+        delete: (id: string) => api.delete(`/admin/users/${id}`),
+    },
+
+    // Plans
+    plans: {
+        list: () => api.get('/admin/plans'),
+        get: (id: string) => api.get(`/admin/plans/${id}`),
+        update: (id: string, data: object) => api.put(`/admin/plans/${id}`, data),
+    },
+
+    // Payments
+    payments: {
+        list: (params?: { page?: number; limit?: number; status?: string }) =>
+            api.get('/admin/payments', { params }),
+    },
+
+    // Services
+    services: {
+        list: () => api.get('/admin/services'),
+        create: (data: { name: string; baseUrl: string; logoUrl?: string; defaultConfig?: object }) =>
+            api.post('/admin/services', data),
+        update: (id: string, data: object) => api.put(`/admin/services/${id}`, data),
+        delete: (id: string) => api.delete(`/admin/services/${id}`),
+    },
+
+    // Settings
+    settings: {
+        get: () => api.get('/admin/settings'),
+        update: (data: Record<string, string>) => api.put('/admin/settings', data),
+    },
+
+    // Payment Providers
+    paymentProviders: {
+        list: () => api.get('/admin/payment-providers'),
+        update: (provider: string, data: object) =>
+            api.put(`/admin/payment-providers/${provider}`, data),
+    },
+
+    // Legal Pages
+    legal: {
+        list: () => api.get('/admin/legal'),
+        get: (slug: string) => api.get(`/admin/legal/${slug}`),
+        update: (slug: string, data: { title?: string; content?: string; isPublished?: boolean }) =>
+            api.put(`/admin/legal/${slug}`, data),
+    },
+}

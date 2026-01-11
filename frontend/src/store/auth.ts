@@ -6,6 +6,7 @@ interface User {
     email: string
     name: string | null
     tier: 'FREE' | 'PREMIUM'
+    isAdmin: boolean
     emailVerified: boolean
     createdAt: string
 }

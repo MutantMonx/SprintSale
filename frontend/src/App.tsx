@@ -11,6 +11,17 @@ import SearchConfigsPage from '@/pages/SearchConfigsPage'
 import ListingsPage from '@/pages/ListingsPage'
 import NotificationsPage from '@/pages/NotificationsPage'
 import SettingsPage from '@/pages/SettingsPage'
+// Admin pages
+import AdminDashboardPage from '@/pages/admin/AdminDashboardPage'
+import AdminUsersPage from '@/pages/admin/AdminUsersPage'
+import AdminPlansPage from '@/pages/admin/AdminPlansPage'
+import AdminSettingsPage from '@/pages/admin/AdminSettingsPage'
+import AdminPaymentProvidersPage from '@/pages/admin/AdminPaymentProvidersPage'
+import AdminLegalPage from '@/pages/admin/AdminLegalPage'
+// Legal pages
+import PrivacyPolicyPage from '@/pages/PrivacyPolicyPage'
+import TermsOfServicePage from '@/pages/TermsOfServicePage'
+import PricingPage from '@/pages/PricingPage'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
     const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
@@ -56,6 +67,11 @@ export default function App() {
                     />
                 </Route>
 
+                {/* Public legal pages (no layout) */}
+                <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+                <Route path="/terms-of-service" element={<TermsOfServicePage />} />
+                <Route path="/pricing" element={<PricingPage />} />
+
                 {/* Protected app routes */}
                 <Route
                     element={
@@ -70,6 +86,14 @@ export default function App() {
                     <Route path="/listings" element={<ListingsPage />} />
                     <Route path="/notifications" element={<NotificationsPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
+
+                    {/* Admin routes - protected by AdminRoute component inside Layout */}
+                    <Route path="/admin" element={<AdminDashboardPage />} />
+                    <Route path="/admin/users" element={<AdminUsersPage />} />
+                    <Route path="/admin/plans" element={<AdminPlansPage />} />
+                    <Route path="/admin/settings" element={<AdminSettingsPage />} />
+                    <Route path="/admin/payment-providers" element={<AdminPaymentProvidersPage />} />
+                    <Route path="/admin/legal" element={<AdminLegalPage />} />
                 </Route>
 
                 {/* Redirect root to dashboard or login */}
@@ -81,3 +105,4 @@ export default function App() {
         </>
     )
 }
+
