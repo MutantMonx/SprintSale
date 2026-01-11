@@ -221,6 +221,18 @@ function buildSearchUrl(
             return url.toString();
         }
 
+        case 'autoplac': {
+            // Autoplac format: https://autoplac.pl/oferty/samochody-osobowe?q=keyword
+            let url = 'https://autoplac.pl/oferty/samochody-osobowe';
+            const params = new URLSearchParams();
+            if (keywordString) params.set('q', keywordString);
+            if (priceMin) params.set('cena_od', String(priceMin));
+            if (priceMax) params.set('cena_do', String(priceMax));
+            if (location) params.set('lokalizacja', location);
+            const paramString = params.toString();
+            return paramString ? `${url}?${paramString}` : url;
+        }
+
         default: {
             // Generic fallback using baseUrl
             const url = new URL(baseUrl);

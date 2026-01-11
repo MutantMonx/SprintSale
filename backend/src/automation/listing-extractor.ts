@@ -42,15 +42,15 @@ const EXTRACTORS: Record<string, ListingExtractorConfig> = {
         },
     },
     otomoto: {
-        // OTOMOTO listings are now embedded in OLX with same structure
-        containerSelector: '[data-cy="l-card"], article[data-id], [data-testid="listing-ad"]',
+        // OTOMOTO.pl - uses article elements with h3 for price
+        containerSelector: 'article',
         fields: {
-            title: { selector: 'h4, h1, h2', attribute: undefined },
-            price: { selector: '[data-testid="ad-price"], [data-testid="listing-price"]', regex: '([\\d\\s]+)' },
-            location: { selector: '[data-testid="location-date"], [data-testid="location"]' },
+            title: { selector: 'h2, h1', attribute: undefined },
+            price: { selector: 'h3', regex: '([\\d\\s]+)' },
+            location: { selector: '[class*="location"], p[class*="location"]' },
             link: { selector: 'a', attribute: 'href' },
             image: { selector: 'img', attribute: 'src' },
-            externalId: { selector: 'article', attribute: 'data-id' },
+            externalId: { selector: 'a', attribute: 'href', regex: '/oferta/([^/\\.]+)' },
         },
     },
     allegro: {
@@ -76,14 +76,15 @@ const EXTRACTORS: Record<string, ListingExtractorConfig> = {
         },
     },
     autoplac: {
-        containerSelector: '.offer-item, .car-item, article.listing',
+        // Autoplac.pl - uses a.tile as container
+        containerSelector: 'a.tile',
         fields: {
-            title: { selector: 'h2 a, .title a, .offer-title' },
-            price: { selector: '.price, .offer-price', regex: '([\\d\\s]+)' },
-            location: { selector: '.location, .offer-location' },
-            link: { selector: 'a[href*="/oferta/"], h2 a, .title a', attribute: 'href' },
+            title: { selector: 'h3' },
+            price: { selector: 'nwa-offer-tile-price p', regex: '([\\d\\s]+)' },
+            location: { selector: 'nwa-offer-tile-location' },
+            link: { selector: 'a.tile', attribute: 'href' },
             image: { selector: 'img', attribute: 'src' },
-            externalId: { selector: '[data-id], article', attribute: 'data-id' },
+            externalId: { selector: 'a.tile', attribute: 'href', regex: '/oferta/([^/]+)' },
         },
     },
 };
